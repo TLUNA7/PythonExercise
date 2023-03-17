@@ -1,0 +1,410 @@
+# from flask import Flask, render_template, request, redirect, url_for, flash
+# from flask_sqlalchemy import SQLAlchemy
+
+# app = Flask(__name__)
+# app.config['SQLALCHEMY_DATABASE_URI'] = "sqlite:///database.db"
+# app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+# app.config['SECRET_KEY'] = 'thisisasecretkey'
+
+# db = SQLAlchemy(app)
+
+# @app.before_first_request
+# def create_tables():
+#     db.create_all()
+
+# class users(db.Model):
+#     user = db.Column("id", db.String(), primary_key=True)
+#     email = db.Column("email", db.String())
+#     password = db.Column("pass", db.String())
+
+#     def _init_(self, email, password, user):
+#         self.email = email
+#         self.password = password
+#         self.user = user
+
+# @app.route('/', methods=['POST', 'GET'])
+# def home():
+#     if request.method == "POST":
+#         if request.form.get('home') == 'home':
+#             email_Rec = request.form.get('email')
+#             name_rec = request.form.get('name')
+#             password_rec = request.form.get('password')
+
+#             user_email = users.query.filter_by(email=email_Rec).first()
+#             if user_email:
+#                 return flash('exists', category='error')
+#             else:
+#                 print(email_Rec, name_rec,password_rec)
+#                 new_user = users(email_Rec,password_rec,name_rec)
+#                 db.session.add(new_user)
+#                 db.session.commit()
+#     return render_template('register.html')
+
+# if __name__ == '__main__':
+#     app.run(port=5000, debug=True)
+
+
+# from flask import Flask, request, redirect
+# # import validators
+# import uuid
+# import datetime
+# import sqlite3
+
+# app = Flask(__name__)
+
+# # Database initialization
+# conn = sqlite3.connect('urls.db')
+# cursor = conn.cursor()
+# cursor.execute('''CREATE TABLE IF NOT EXISTS urls
+#                     (id INTEGER PRIMARY KEY AUTOINCREMENT,
+#                     original_url TEXT NOT NULL,
+#                     short_url TEXT NOT NULL UNIQUE,
+#                     user_id INTEGER NOT NULL,
+#                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+#                     accessed_count INTEGER DEFAULT 0)''')
+# cursor.execute('''CREATE TABLE IF NOT EXISTS users
+#                     (id INTEGER PRIMARY KEY AUTOINCREMENT,
+#                     username TEXT NOT NULL UNIQUE,
+#                     api_key TEXT NOT NULL UNIQUE)''')
+# conn.commit()
+
+# # Function to generate a UUID-based short URL
+# def generate_short_url():
+#     return str(uuid.uuid4())[:8]
+
+# # API to create a short URL with a random name
+# @app.route('/api/shorten', methods=['POST'])
+# def shorten_url():
+#     url = request.json['url']
+#     user_id = request.json['user_id']
+#     if not validators.url(url) or len(url) > 250:
+#         return {'error': 'Invalid URL'}, 400
+#     short_url = generate_short_url()
+#     cursor.execute("INSERT INTO urls (original_url, short_url, user_id) VALUES (?, ?, ?)", (url, short_url, user_id))
+#     conn.commit()
+#     return {'short_url': short_url}, 201
+
+# # API to create a short URL with a custom name (for premium clients)
+# @app.route('/api/custom', methods=['POST'])
+# def create_custom_url():
+#     url = request.json['url']
+#     custom_name = request.json['custom_name']
+#     user_id = request.json['user_id']
+#     if not validators.url(url) or len(url) > 250:
+#         return {'error': 'Invalid URL'}, 400
+#     cursor.execute("SELECT * FROM urls WHERE short_url = ?", (custom_name,))
+#     if cursor.fetchone() is not None:
+#         return {'error': 'Custom name already in use'}, 409
+#     cursor.execute("INSERT INTO urls (original_url, short_url, user_id) VALUES (?, ?, ?)", (url, custom_name, user_id))
+#     conn.commit()
+#     return {'short_url': custom_name}, 201
+
+# # Redirect short URL to original URL
+# @app.route('/<string:short_url>')
+# def redirect_to_original_url(short_url):
+#     cursor.execute("SELECT original_url FROM urls WHERE short_url = ?", (short_url,))
+#     result = cursor.fetchone()
+#     if result is None:
+#         return {'error': 'Short URL not found'}, 404
+#     cursor.execute("UPDATE urls SET accessed_count = accessed_count + 1 WHERE short_url = ?", (short_url,))
+#     conn.commit()
+#     return redirect(result[0])
+
+# # Delete old URLs
+# def delete_old_urls():
+#     cursor.execute("DELETE FROM urls WHERE created_at < ?", (datetime.datetime.now() - datetime.timedelta(days=30),))
+#     conn.commit()
+
+# if __name__ == '__main_-':
+#     app.run(debug=True)
+
+# import string
+# import random
+# from flask import Flask, request, redirect, render_template
+# import sqlite3
+# import datetime
+# import os
+
+# app = Flask(__name__)
+
+# DATABASE_NAME = 'url_shortener.db'
+# DATABASE_PATH = os.path.join(os.path.dirname(__file__), DATABASE_NAME)
+
+
+# def init_database():
+#     with sqlite3.connect(DATABASE_PATH) as conn:
+#         conn.execute('CREATE TABLE IF NOT EXISTS urls (id INTEGER PRIMARY KEY AUTOINCREMENT, original_url TEXT, short_url TEXT, created_at DATETIME)')
+#         conn.commit()
+
+
+# def generate_short_url():
+#     chars = string.ascii_letters + string.digits
+#     while True:
+#         short_url = ''.join(random.choices(chars, k=7))
+#         with sqlite3.connect(DATABASE_PATH) as conn:
+#             cursor = conn.cursor()
+#             cursor.execute("SELECT id FROM urls WHERE short_url = ?", (short_url,))
+#             if not cursor.fetchone():
+#                 return short_url
+
+
+# @app.route('/')
+# def index():
+#     return render_template('home.html')
+
+
+# @app.route('/', methods=['POST'])
+# def shorten_url():
+#     original_url = request.form['url']
+#     if not original_url.startswith('http'):
+#         original_url = 'http://' + original_url
+
+#     # Validate the URL
+#     try:
+#         res = request.get(original_url)
+#         if res.status_code != 200:
+#             raise Exception("Invalid URL")
+#     except Exception as e:
+#         return render_template('login.html', message=str(e))
+
+#     with sqlite3.connect(DATABASE_PATH) as conn:
+#         cursor = conn.cursor()
+#         cursor.execute("SELECT short_url FROM urls WHERE original_url = ?", (original_url,))
+#         row = cursor.fetchone()
+#         if row:
+#             short_url = row[0]
+#         else:
+#             short_url = generate_short_url()
+#             created_at = datetime.datetime.now()
+#             cursor.execute("INSERT INTO urls (original_url, short_url, created_at) VALUES (?, ?, ?)", (original_url, short_url, created_at))
+#             conn.commit()
+
+#     return render_template('login.html', short_url=short_url)
+
+
+# @app.route('/<short_url>')
+# def redirect_to_original_url(short_url):
+#     with sqlite3.connect(DATABASE_PATH) as conn:
+#         cursor = conn.cursor()
+#         cursor.execute("SELECT original_url FROM urls WHERE short_url = ?", (short_url,))
+#         row = cursor.fetchone()
+#         if row:
+#             original_url = row[0]
+#             cursor.execute("UPDATE urls SET accessed_at = ? WHERE short_url = ?", (datetime.datetime.now(), short_url))
+#             conn.commit()
+#             return redirect(original_url)
+#         else:
+#             return render_template('register.html', message="Invalid short URL")
+
+
+# if __name__ == '__main__':
+#     init_database()
+#     app.run(debug=True)
+
+
+# import string
+# import random
+# from datetime import datetime, timedelta
+# from urllib.parse import urlparse
+
+# class UrlShortener:
+    
+#     def _init_(self):
+#         self.urls = {}
+    
+#     def create_short_url(self, url):
+#         parsed_url = urlparse(url)
+#         if parsed_url.scheme == "" or parsed_url.netloc == "":
+#             raise ValueError("Invalid URL")
+#         if len(url) > 250:
+#             raise ValueError("URL too long")
+#         while True:
+#             short_name = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
+#             if short_name not in self.urls:
+#                 break
+#         self.urls[short_name] = {"url": url, "count": 0, "created_at": datetime.now()}
+#         return f"url/{short_name}"
+    
+#     def create_custom_url(self, url, custom_name):
+#         parsed_url = urlparse(url)
+#         if parsed_url.scheme == "" or parsed_url.netloc == "":
+#             raise ValueError("Invalid URL")
+#         if len(url) > 250:
+#             raise ValueError("URL too long")
+#         if custom_name in self.urls:
+#             raise ValueError("Custom name already exists")
+#         self.urls[custom_name] = {"url": url, "count": 0, "created_at": datetime.now()}
+#         return f"url/{custom_name}"
+    
+#     def get_url(self, short_name):
+#         if short_name in self.urls:
+#             self.urls[short_name]["count"] += 1
+#             return self.urls[short_name]["url"]
+#         else:
+#             return None
+    
+#     def delete_expired_urls(self):
+#         for short_name, url_info in self.urls.items():
+#             if datetime.now() - url_info["created_at"] > timedelta(days=30):
+#                 del self.urls[short_name]
+    
+#     def get_url_info(self, short_name):
+#         if short_name in self.urls:
+#             return self.urls[short_name]
+#         else:
+#             return None
+
+# url_shortener = UrlShortener()
+# short_url = url_shortener.create_short_url("https://www.geeksforgeeks.org/how-to-replace-values-in-a-list-in-python/")
+# print(short_url)
+
+# import string
+# import random
+# from urllib.parse import urlparse
+# from flask import Flask, request, jsonify
+# from flask_sqlalchemy import SQLAlchemy
+
+# app = Flask(__name__)
+# app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///urls.db'
+# app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+# db = SQLAlchemy(app)
+
+# class Url(db.Model):
+#     id = db.Column(db.Integer, primary_key=True)
+#     short_name = db.Column(db.String(8), unique=True, nullable=False)
+#     url = db.Column(db.String(250), nullable=False)
+
+#     def _repr_(self):
+#         return f"<Url {self.short_name}>"
+
+# class UrlShortener:
+
+#     def _init_(self):
+#         self.db = db
+
+#     def create_short_url(self, url):
+#         parsed_url = urlparse(url)
+#         if parsed_url.scheme == "" or parsed_url.netloc == "":
+#             raise ValueError("Invalid URL")
+#         if len(url) > 250:
+#             raise ValueError("URL too long")
+#         while True:
+#             short_name = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
+#             if not Url.query.filter_by(short_name=short_name).first():
+#                 break
+#         url_obj = Url(short_name=short_name, url=url)
+#         db.session.add(url_obj)
+#         db.session.commit()
+#         return f"url/{short_name}"
+    
+#     def create_custom_url(self, url, custom_name):
+#         parsed_url = urlparse(url)
+#         if parsed_url.scheme == "" or parsed_url.netloc == "":
+#             raise ValueError("Invalid URL")
+#         if len(url) > 250:
+#             raise ValueError("URL too long")
+#         if Url.query.filter_by(short_name=custom_name).first():
+#             raise ValueError("Custom name already exists")
+#         url_obj = Url(short_name=custom_name, url=url)
+#         db.session.add(url_obj)
+#         db.session.commit()
+#         return f"url/{custom_name}"
+
+# url_shortener = UrlShortener()
+
+# @app.route('/api/create_short_url', methods=['POST'])
+# def create_short_url():
+#     url = request.json['url']
+#     try:
+#         short_url = url_shortener.create_short_url(url)
+#         return jsonify({"short_url": short_url})
+#     except ValueError as e:
+#         return jsonify({"error": str(e)}), 400
+
+# @app.route('/api/create_custom_url', methods=['POST'])
+# def create_custom_url():
+#     url = request.json['url']
+#     custom_name = request.json['custom_name']
+#     try:
+#         short_url = url_shortener.create_custom_url(url, custom_name)
+#         return jsonify({"short_url": short_url})
+#     except ValueError as e:
+#         return jsonify({"error": str(e)}), 400
+
+# if __name__ == '__main__':
+#     app.run(debug=True)
+import string
+import random
+from flask import Flask, request, jsonify
+from flask_sqlalchemy import SQLAlchemy
+from urllib.parse import urlparse
+
+app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///urls.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db = SQLAlchemy(app)
+
+class Url(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    short_name = db.Column(db.String(8), unique=True, nullable=False)
+    url = db.Column(db.String(250), nullable=False)
+
+    def _repr_(self):
+        return f"<Url {self.short_name}>"
+
+class UrlShortener:
+
+    def _init_(self):
+        self.db = db
+
+    def create_short_url(self, url):
+        parsed_url = urlparse(url)
+        if parsed_url.scheme == "" or parsed_url.netloc == "":
+            raise ValueError("Invalid URL")
+        if len(url) > 250:
+            raise ValueError("URL too long")
+        while True:
+            short_name = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
+            if not Url.query.filter_by(short_name=short_name).first():
+                break
+        url_obj = Url(short_name=short_name, url=url)
+        db.session.add(url_obj)
+        db.session.commit()
+        return f"url/{short_name}"
+    
+    def create_custom_url(self, url, custom_name):
+        parsed_url = urlparse(url)
+        if parsed_url.scheme == "" or parsed_url.netloc == "":
+            raise ValueError("Invalid URL")
+        if len(url) > 250:
+            raise ValueError("URL too long")
+        if Url.query.filter_by(short_name=custom_name).first():
+            raise ValueError("Custom name already exists")
+        url_obj = Url(short_name=custom_name, url=url)
+        db.session.add(url_obj)
+        db.session.commit()
+        return f"url/{custom_name}"
+
+url_shortener = UrlShortener()
+
+@app.route('/api/create_short_url', methods=['POST'])
+def create_short_url():
+    url = request.json['url']
+    try:
+        short_url = url_shortener.create_short_url(url)
+        return jsonify({"short_url": short_url})
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+@app.route('/api/create_custom_url', methods=['POST'])
+def create_custom_url():
+    url = request.json['url']
+    custom_name = request.json['custom_name']
+    try:
+        short_url = url_shortener.create_custom_url(url, custom_name)
+        return jsonify({"short_url": short_url})
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+if __name__ == '__main__':
+    app.run(debug=True)
